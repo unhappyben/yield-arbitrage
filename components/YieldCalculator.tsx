@@ -29,15 +29,47 @@ const YieldCalculator: React.FC = () => {
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
   const [loading, setLoading] = useState(true);
   const [assets, setAssets] = useState<TokenInfo[]>([]);
-  const [strategies] = useState<Strategy[]>([]);
+  const [strategies, setStrategies] = useState<Strategy[]>([]);
+
+  const processSiloData = (data: any): TokenInfo[] => {
+    return Object.entries(data.pageProps.markets).map(([_, market]: [string, any]) => ({
+      symbol: market.asset.symbol,
+      name: market.asset.name,
+      address: market.asset.address,
+      maxLtv: market.maxLTV,
+      utilization: market.utilization * 100,
+      borrowApy: market.borrowAPY
+    }));
+  };
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const siloData = await fetch('https://app.silo.finance/_next/data/latest/index.json').then(r => r.json());
+        const [siloData, goatData] = await Promise.all([
+          fetch('https://app.silo.finance/_next/data/latest/index.json').then(r => r.json()),
+          fetch('https://api.goat.fi/apy/breakdown').then(r => r.json())
+        ]);
+
         const processedAssets = processSiloData(siloData);
         setAssets(processedAssets);
+
+        const tokenAddresses = processedAssets.map(a => a.address).join(',');
+        const pricesData = await fetch(`https://api.defillama.com/prices/current/arbitrum:${tokenAddresses}`).then(r => r.json());
+
         await loadTokenLogos(processedAssets);
+
+        // Process Goat strategies
+        const goatStrategies = Object.entries(goatData)
+          .filter(([_, data]: [string, any]) => data.totalApy > 0)
+          .map(([address, data]: [string, any]) => ({
+            id: address,
+            name: data.name || 'Unknown Strategy',
+            apy: data.totalApy * 100,
+            token: address.includes('USDC') ? 'USDC.e' : 'crvUSD',
+            minDeposit: 0 // Assuming no minimum deposit, adjust if needed
+          }));
+        setStrategies(goatStrategies);
+
         setLoading(false);
       } catch (error) {
         console.error('Error loading initial data:', error);
@@ -49,12 +81,15 @@ const YieldCalculator: React.FC = () => {
   }, []);
 
   const loadTokenLogos = async (tokens: TokenInfo[]) => {
+    const logoMap: Record<string, string> = {};
     for (const token of tokens) {
       try {
         const logoUrl = `${LOGO_BASE_URL}/${token.symbol.toLowerCase()}.png`;
-        await fetch(logoUrl, { method: 'HEAD' });
+        const response = await fetch(logoUrl, { method: 'HEAD' });
+        logoMap[token.symbol] = response.ok ? logoUrl : '/placeholder.png';
       } catch (error) {
         console.error(`Error loading logo for ${token.symbol}:`, error);
+        logoMap[token.symbol] = '/placeholder.png';
       }
     }
   };
@@ -138,7 +173,7 @@ const YieldCalculator: React.FC = () => {
           <option value="">Select a strategy</option>
           {strategies.map((strategy, idx) => (
             <option key={idx} value={idx}>
-              {strategy.name} - {strategy.apy.toFixed(2)}% APY
+              {strategy.name} ({strategy.token}) - {strategy.apy.toFixed(2)}% APY
             </option>
           ))}
         </select>
