@@ -5,14 +5,6 @@ import { AlertTriangle } from 'lucide-react';
 
 const LOGO_BASE_URL = "https://raw.githubusercontent.com/unhappyben/token-logos/main/logos";
 
-// Types
-interface TokenPrice {
-  price: number;
-  decimals: number;
-  symbol: string;
-  timestamp: number;
-}
-
 interface TokenInfo {
   symbol: string;
   name: string;
@@ -31,30 +23,20 @@ interface Strategy {
 }
 
 const YieldCalculator: React.FC = () => {
-  // State
   const [selectedAsset, setSelectedAsset] = useState<TokenInfo | null>(null);
   const [depositAmount, setDepositAmount] = useState('');
   const [borrowAmount, setBorrowAmount] = useState('');
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
   const [loading, setLoading] = useState(true);
   const [assets, setAssets] = useState<TokenInfo[]>([]);
-  const [strategies, setStrategies] = useState<Strategy[]>([]);
+  const [strategies] = useState<Strategy[]>([]);
 
-  // Load initial data
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [siloData, goatData] = await Promise.all([
-          fetch('https://app.silo.finance/_next/data/latest/index.json').then(r => r.json()),
-          fetch('https://api.goat.fi/apy/breakdown').then(r => r.json())
-        ]);
-
+        const siloData = await fetch('https://app.silo.finance/_next/data/latest/index.json').then(r => r.json());
         const processedAssets = processSiloData(siloData);
         setAssets(processedAssets);
-
-        const tokenAddresses = processedAssets.map(a => a.address).join(',');
-        const prices = await fetch(`https://api.defillama.com/prices/current/arbitrum:${tokenAddresses}`).then(r => r.json());
-
         await loadTokenLogos(processedAssets);
         setLoading(false);
       } catch (error) {
@@ -66,22 +48,17 @@ const YieldCalculator: React.FC = () => {
     loadData();
   }, []);
 
-  // Load token logos
   const loadTokenLogos = async (tokens: TokenInfo[]) => {
-    const logoMap: Record<string, string> = {};
     for (const token of tokens) {
       try {
         const logoUrl = `${LOGO_BASE_URL}/${token.symbol.toLowerCase()}.png`;
-        const response = await fetch(logoUrl, { method: 'HEAD' });
-        logoMap[token.symbol] = response.ok ? logoUrl : '/placeholder.png';
+        await fetch(logoUrl, { method: 'HEAD' });
       } catch (error) {
         console.error(`Error loading logo for ${token.symbol}:`, error);
-        logoMap[token.symbol] = '/placeholder.png';
       }
     }
   };
 
-  // Calculate health factor
   const calculateHealthFactor = () => {
     if (!selectedAsset || !depositAmount || !borrowAmount) return 0;
     const deposit = parseFloat(depositAmount);
@@ -91,7 +68,6 @@ const YieldCalculator: React.FC = () => {
     return (maxBorrow / borrow) * 100;
   };
 
-  // Calculate yields
   const calculateYields = () => {
     if (!selectedAsset || !selectedStrategy || !depositAmount || !borrowAmount) return null;
     const deposit = parseFloat(depositAmount);
@@ -122,7 +98,6 @@ const YieldCalculator: React.FC = () => {
         <CardTitle>Yield Calculator</CardTitle>
       </CardHeader>
       <CardContent>
-        {/* Asset Selection */}
         <select 
           onChange={(e) => setSelectedAsset(assets[parseInt(e.target.value)])}
           value={selectedAsset ? assets.indexOf(selectedAsset) : ''}
@@ -135,7 +110,6 @@ const YieldCalculator: React.FC = () => {
           ))}
         </select>
 
-        {/* Amount Inputs */}
         <Input
           type="number"
           onChange={(e) => setDepositAmount(e.target.value)}
@@ -147,7 +121,6 @@ const YieldCalculator: React.FC = () => {
           placeholder="Borrow Amount ($)"
         />
 
-        {/* Health Factor */}
         {healthFactor > 0 && (
           <div>
             <h3>Health Factor</h3>
@@ -158,7 +131,6 @@ const YieldCalculator: React.FC = () => {
           </div>
         )}
 
-        {/* Strategy Selection */}
         <select
           onChange={(e) => setSelectedStrategy(strategies[parseInt(e.target.value)])}
           value={selectedStrategy ? strategies.indexOf(selectedStrategy) : ''}
@@ -171,7 +143,6 @@ const YieldCalculator: React.FC = () => {
           ))}
         </select>
 
-        {/* Results */}
         {yields && (
           <div>
             <h3>Borrow APY</h3>
