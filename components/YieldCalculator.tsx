@@ -1,23 +1,7 @@
-type ChangeEvent = React.ChangeEvent<HTMLInputElement | HTMLSelectElement>;
-type ProcessedAsset = {
-  symbol: string;
-  address: string;
-  maxLtv: number;
-  utilization: number;
-};
-
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  ArrowRight,
-  AlertTriangle,
-  TrendingUp,
-  Wallet,
-  Percent,
-  DollarSign
-} from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 
 const LOGO_BASE_URL = "https://raw.githubusercontent.com/unhappyben/token-logos/main/logos";
 
@@ -49,8 +33,6 @@ interface Strategy {
 const YieldCalculator: React.FC = () => {
   // State
   const [selectedAsset, setSelectedAsset] = useState<TokenInfo | null>(null);
-  const [prices, setPrices] = useState<Record<string, TokenPrice>>({});
-  const [logos, setLogos] = useState<Record<string, string>>({});
   const [depositAmount, setDepositAmount] = useState('');
   const [borrowAmount, setBorrowAmount] = useState('');
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
@@ -72,7 +54,6 @@ const YieldCalculator: React.FC = () => {
 
         const tokenAddresses = processedAssets.map(a => a.address).join(',');
         const prices = await fetch(`https://api.defillama.com/prices/current/arbitrum:${tokenAddresses}`).then(r => r.json());
-        setPrices(prices.coins);
 
         await loadTokenLogos(processedAssets);
         setLoading(false);
@@ -98,7 +79,6 @@ const YieldCalculator: React.FC = () => {
         logoMap[token.symbol] = '/placeholder.png';
       }
     }
-    setLogos(logoMap);
   };
 
   // Calculate health factor
